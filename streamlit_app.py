@@ -110,20 +110,10 @@ def calculate_congestion(passengers, station_name, data_df, all_data=None):
         # 승하차 인원을 1-10 척도로 변환
         congestion = int(1 + (passengers / max_congestion) * 9)
     
-    # 해당 역의 하루 평균 승하차 인원 계산
-    if all_data is not None:
-        all_stations_avg = all_data.groupby('station_name')['count'].mean()
-    else:
-        all_stations_avg = data_df.groupby('station_name')['count'].mean()
+    # 백분율 계산 (최대 혼잡도 대비)
+    percentile = (passengers / max_congestion) * 100
     
-    station_avg = all_stations_avg.get(station_name, 0)
-    if station_avg > 0:
-        # 현재 승하차 인원이 해당 역 평균 대비 몇 %인지 계산
-        station_relative_pct = (passengers / station_avg) * 100
-    else:
-        station_relative_pct = 0
-    
-    return congestion, passengers / max_congestion * 100, station_relative_pct  # 혼잡도, 절대적 백분율, 역별 하루 평균 대비 %
+    return congestion, percentile  # 혼잡도, 절대적 백분율
 
 # 예측 모델 함수
 def predict_model(features, data_df):
@@ -170,7 +160,7 @@ def predict_model(features, data_df):
     prediction = int(day_avg * weather_factor)
     
     # 혼잡도 계산
-    congestion, _, _ = calculate_congestion(prediction, features['station_name'], data_df)
+    congestion, _ = calculate_congestion(prediction, features['station_name'], data_df)
     
     return prediction, congestion
 
@@ -404,7 +394,7 @@ def predict_all_stations_congestion(model, current_weather, all_stations, data_d
             predicted_count = model.predict(X_pred)[0]
             
             # 혼잡도 계산 (1-10 스케일)
-            congestion, percentile, station_relative_pct = calculate_congestion(predicted_count, station['station_name'], data_df)
+            congestion, percentile = calculate_congestion(predicted_count, station['station_name'], data_df)
             
             results.append({
                 'station_name': station['station_name'],
@@ -414,8 +404,7 @@ def predict_all_stations_congestion(model, current_weather, all_stations, data_d
                 'longitude': station['longitude'],
                 'predicted_count': int(predicted_count),
                 'congestion': congestion,
-                'percentile': percentile,
-                'station_relative_pct': station_relative_pct
+                'percentile': percentile
             })
         except Exception as e:
             st.error(f"예측 오류 ({station['station_name']}): {e}")
@@ -428,8 +417,7 @@ def predict_all_stations_congestion(model, current_weather, all_stations, data_d
                 'longitude': station['longitude'],
                 'predicted_count': 0,
                 'congestion': 1,
-                'percentile': 0,
-                'station_relative_pct': 0
+                'percentile': 0
             })
     
     return pd.DataFrame(results)
@@ -995,7 +983,6 @@ elif analysis_mode == "실시간 혼잡도 예측":
                 <p><b>예측 승하차 인원:</b> {row['predicted_count']:,}명</p>
                 <p><b>혼잡도:</b> {congestion_level}/10 ({congestion_text})</p>
                 <p><b>백분위:</b> 상위 {row['percentile']:.1f}%</p>
-                <p><b>역 평균 대비:</b> {row['station_relative_pct']:.1f}%</p>
             </div>
             """
             
@@ -1044,8 +1031,7 @@ elif analysis_mode == "실시간 혼잡도 예측":
             'line': '호선',
             'predicted_count': '예측 승하차인원',
             'congestion': '혼잡도',
-            'percentile': '백분위',
-            'station_relative_pct': '역 평균 대비 (%)'
+            'percentile': '백분위'
         }
         
         # 데이터프레임 표시
@@ -1060,8 +1046,7 @@ elif analysis_mode == "실시간 혼잡도 예측":
                     max_value=10,
                     format="%d"
                 ),
-                '백분위': st.column_config.NumberColumn(format="%.1f%%"),
-                '역 평균 대비 (%)': st.column_config.NumberColumn(format="%.1f%%")
+                '백분위': st.column_config.NumberColumn(format="%.1f%%")
             }
         )
         

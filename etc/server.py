@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 import pandas as pd, joblib
 
 app   = FastAPI()
-model = joblib.load('subway_xgb_best.pkl')
+model = joblib.load('../subway_xgb_best.pkl')
 
 # ── (1) 학습 때와 동일한 전처리 ─────────────────────────────────────
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
